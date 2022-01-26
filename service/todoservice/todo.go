@@ -21,6 +21,7 @@ func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
 
 		isValidEmail, isValidEmailMsg := validateEmail(user.Email)
 		if !isValidEmail {
+			fmt.Println(isValidEmailMsg, "user.Email", user.Email)
 			ctx.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"data": nil,
@@ -124,7 +125,7 @@ func AddTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 		var task models.Task
 		ctx.ShouldBindJSON(&task)
 		isDataValid, message := validateData(task)
-
+		fmt.Println(task)
 		if !isDataValid {
 			ctx.JSON(http.StatusOK, gin.H{
 				"success": false,
