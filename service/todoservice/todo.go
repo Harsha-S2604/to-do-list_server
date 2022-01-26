@@ -12,6 +12,112 @@ import (
 
 )
 
+func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
+
+	getTasks := func(ctx *gin.Context) {
+		var tasks []models.Task
+		var user models.User
+		ctx.ShouldBindJSON(&user)
+
+		isValidEmail, isValidEmailMsg := validateEmail(user.Email)
+		if !isValidEmail {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": isValidEmailMsg,
+			})
+			return
+		}
+
+		isUserExists, isUserExistsMessage := checkUserExists(user.Email, todoDB)
+		if !isUserExists {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": isUserExistsMessage,
+			})
+			return	
+		}
+
+		queryParams := ctx.Request.URL.Query()
+		limitStr, ok := queryParams["limit"]
+		if !ok {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "invalid request",
+			})
+			return
+		}
+		limit, limitErr := strconv.Atoi(limitStr[0])
+		if limitErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+
+		offsetStr, ok := queryParams["offset"]
+		if !ok {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "invalid request",
+			})
+			return
+		}
+
+		offset, offsetErr := strconv.Atoi(offsetStr[0])
+		if offsetErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+
+		getQuery := `SELECT * FROM todo_list WHERE email=$1 LIMIT $2 OFFSET $3`
+		rows, rowsErr := todoDB.Query(getQuery, user.Email, limit, offset - 1)
+		if rowsErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+		for rows.Next() {
+			var task models.Task
+	
+			rowScanErr := rows.Scan(&task.TaskId, &task.TaskName, &task.IsCompleted, &task.User.Email)
+	
+			if rowScanErr != nil {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": "Sorry something went wrong. Please try again later.",
+				})
+				return
+			}
+	
+			tasks = append(tasks, task)
+	
+		}
+
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+			"data": tasks,
+		})
+	}
+
+	return gin.HandlerFunc(getTasks)
+}
+
 func AddTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 	
 	addTask := func(ctx *gin.Context) {
@@ -151,4 +257,13 @@ func checkUserExists(email string, todoDB *sql.DB) (bool, string) {
     default:
         return false, "Sorry something went wrong. Please try again later."
     }
+}
+
+func validateEmail(email string) (bool, string) {
+	var re = regexp.MustCompile(`^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$`)
+	if !re.MatchString(email) {
+		return false, "not a valid email"
+	}
+
+	return true, ""
 }
