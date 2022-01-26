@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"database/sql"
 	"regexp"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/Harsha-S2604/to-do-list_server/models"
@@ -55,6 +56,54 @@ func AddTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 	return gin.HandlerFunc(addTask)
 }
 
+func RemoveTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
+
+	removeTask := func(ctx *gin.Context) {
+		taskId, taskIdErr := strconv.Atoi(ctx.Params.ByName("id"))
+
+		if taskIdErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+
+		if taskId == 0 {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"message": "Task does not exist",
+			})
+			return
+		}
+
+		isTaskExist, isTaskExistMsg := checkTaskExist(taskId, todoDB)
+		if !isTaskExist {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": isTaskExistMsg,
+			})
+			return
+		}
+
+		removeTaskQuery := `DELETE FROM todo_list WHERE task_id=$1`
+		_, removeTaskQueryErr := todoDB.Exec(removeTaskQuery, taskId)
+		if removeTaskQueryErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Task removed successfully",
+		})
+	}
+
+	return gin.HandlerFunc(removeTask)
+}
 
 func validateData(task models.Task) (bool, string) {
 	if task.User.Email == "" {
@@ -72,6 +121,21 @@ func validateData(task models.Task) (bool, string) {
 
 
 	return true, ""
+}
+
+func checkTaskExist(taskId int, todoDB *sql.DB) (bool, string) {
+	var taskFromDB string
+	taskExistsQuery := `SELECT task_name from todo_list WHERE task_id=$1;`
+	row := todoDB.QueryRow(taskExistsQuery, taskId)
+	err := row.Scan(&taskFromDB)
+	switch err {
+    case sql.ErrNoRows:
+        return false, "task does not exist"
+    case nil:
+        return true, ""
+    default:
+        return false, "Sorry something went wrong. Please try again later."
+    }
 }
 
 func checkUserExists(email string, todoDB *sql.DB) (bool, string) {
