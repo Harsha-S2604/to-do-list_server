@@ -104,3 +104,40 @@ func TestAddTasks(t *testing.T) {
 	
 
 }
+
+func TestRemoveTasks(t *testing.T) {
+
+	gin.SetMode(gin.TestMode)
+
+	r := gin.Default()
+    r.DELETE("/:id", todoservice.RemoveTaskHandler(todoDB))
+
+	req, reqErr := http.NewRequest(http.MethodDelete, "/5", nil)
+	req.Header.Set("Content-Type", "application/json")
+    if reqErr != nil {
+        t.Fatalf("Couldn't create request: %v\n", reqErr)
+    }
+
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+    if status := w.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+
+	respBody := map[string]interface{}{}
+    if err := json.Unmarshal([]byte(w.Body.String()), &respBody); err != nil {
+        panic("unmarshaling response body returned error")
+    }
+
+	expected := true
+	log.Println(respBody)
+
+	if respBody["success"] != expected {
+		t.Errorf("handler returned unexpected body: got %v want %v",
+		respBody["success"], expected)
+	}
+	
+
+}
