@@ -211,6 +211,57 @@ func RemoveTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 	return gin.HandlerFunc(removeTask)
 }
 
+func UpdateTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
+	
+	updateTask := func(ctx *gin.Context) {
+		
+		taskId, taskIdErr := strconv.Atoi(ctx.Params.ByName("id"))
+
+		if taskIdErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+		form, formErr := ctx.MultipartForm()
+		if formErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+		isTaskExist, isTaskExistMsg := checkTaskExist(taskId, todoDB)
+		if !isTaskExist {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": isTaskExistMsg,
+			})
+			return
+		}
+		isCompletedArr := form.Value["isCompleted"]
+		var isCompleted interface{}
+		isCompleted = isCompletedArr[0]
+
+		updateQuery := `UPDATE todo_list SET is_completed=$1 WHERE task_id=$2;`
+		_, updateErr := todoDB.Exec(updateQuery, isCompleted, taskId)
+		if updateErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "task updated successfully",
+		})
+	}
+
+	return gin.HandlerFunc(updateTask)
+}
+
 func validateData(task models.Task) (bool, string) {
 	if task.User.Email == "" {
 		return false, "email is required"

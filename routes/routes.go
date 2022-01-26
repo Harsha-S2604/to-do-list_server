@@ -22,6 +22,8 @@ func SetupRouter(todoDB *sql.DB) *gin.Engine{
 	{
 		todoAPIRouter.GET("/tasks", todoservice.GetTasksHandler(todoDB))
 
+		todoAPIRouter.PUT("/update/:id", todoservice.UpdateTaskHandler(todoDB))
+
 		todoAPIRouter.POST("/add", todoservice.AddTaskHandler(todoDB))
 
 		todoAPIRouter.DELETE("/remove/:id", todoservice.RemoveTaskHandler(todoDB))
