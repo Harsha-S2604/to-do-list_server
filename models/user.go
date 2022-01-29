@@ -1,5 +1,6 @@
 package models
 
 type User struct {
-	Email string
+	UserId 	int
+	Email 	string
 }

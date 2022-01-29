@@ -11,18 +11,18 @@ import (
 )
 
 func SetupRouter(todoDB *sql.DB) *gin.Engine{
-	gin.SetMode(gin.ReleaseMode)
+	// gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
-	config := cors.Config{
-		AllowOrigins: []string{"http://localhost:3000"},
-		AllowHeaders:     []string{"Origin", "content-type"},
-	}
+	// config := cors.Config{
+	// 	AllowOrigins: []string{"http://localhost:8081"},
+	// 	AllowHeaders:     []string{"Origin", "content-type", "Access-Control-Allow-Origin"},
+	// }
 
-	router.Use(cors.New(config))
+	router.Use(cors.Default())
 
 	todoAPIRouter := router.Group("api/v1/todo/task")
 	{
-		todoAPIRouter.GET("/tasks", todoservice.GetTasksHandler(todoDB))
+		todoAPIRouter.GET("/tasks/:id", todoservice.GetTasksHandler(todoDB))
 
 		todoAPIRouter.PUT("/update/:id", todoservice.UpdateTaskHandler(todoDB))
 

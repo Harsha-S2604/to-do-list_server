@@ -16,21 +16,17 @@ func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
 
 	getTasks := func(ctx *gin.Context) {
 		var tasks []models.Task
-		var user models.User
-		ctx.ShouldBindJSON(&user)
-
-		isValidEmail, isValidEmailMsg := validateEmail(user.Email)
-		if !isValidEmail {
-			fmt.Println(isValidEmailMsg, "user.Email", user.Email)
+		userId, userIdErr := strconv.Atoi(ctx.Params.ByName("id"))
+		if userIdErr != nil {
+			fmt.Println("useriderr", userIdErr.Error())
 			ctx.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"data": nil,
-				"message": isValidEmailMsg,
+				"message": "Sorry something went wrong. Please try again later.",
 			})
 			return
 		}
 
-		isUserExists, isUserExistsMessage := checkUserExists(user.Email, todoDB)
+		isUserExists, isUserExistsMessage := checkUserExists(userId, todoDB)
 		if !isUserExists {
 			ctx.JSON(http.StatusOK, gin.H{
 				"success": false,
@@ -80,8 +76,8 @@ func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		getQuery := `SELECT * FROM todo_list WHERE email=$1 LIMIT $2 OFFSET $3`
-		rows, rowsErr := todoDB.Query(getQuery, user.Email, limit, offset - 1)
+		getQuery := `SELECT * FROM todo_list WHERE user_id=$1 ORDER BY task_id DESC LIMIT $2 OFFSET $3`
+		rows, rowsErr := todoDB.Query(getQuery, userId, limit, offset - 1)
 		if rowsErr != nil {
 			ctx.JSON(http.StatusOK, gin.H{
 				"success": false,
@@ -93,7 +89,7 @@ func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var task models.Task
 	
-			rowScanErr := rows.Scan(&task.TaskId, &task.TaskName, &task.IsCompleted, &task.User.Email)
+			rowScanErr := rows.Scan(&task.TaskId, &task.TaskName, &task.IsCompleted, &task.User.UserId)
 	
 			if rowScanErr != nil {
 				ctx.JSON(http.StatusOK, gin.H{
@@ -134,7 +130,7 @@ func AddTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		isUserExists, isUserExistsMessage := checkUserExists(task.User.Email, todoDB)
+		isUserExists, isUserExistsMessage := checkUserExists(task.User.UserId, todoDB)
 		if !isUserExists {
 			ctx.JSON(http.StatusOK, gin.H{
 				"success": false,
@@ -143,8 +139,8 @@ func AddTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		addTaskQuery := `INSERT INTO todo_list (task_name, is_completed, email) VALUES($1, $2, $3)`
-		_, addTaskQueryErr := todoDB.Exec(addTaskQuery, task.TaskName, task.IsCompleted, task.User.Email)
+		addTaskQuery := `INSERT INTO todo_list (task_name, is_completed, user_id) VALUES($1, $2, $3)`
+		_, addTaskQueryErr := todoDB.Exec(addTaskQuery, task.TaskName, task.IsCompleted, task.User.UserId)
 		if addTaskQueryErr != nil {
 			fmt.Println(addTaskQueryErr.Error())
 			ctx.JSON(http.StatusOK, gin.H{
@@ -264,19 +260,13 @@ func UpdateTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 }
 
 func validateData(task models.Task) (bool, string) {
-	if task.User.Email == "" {
-		return false, "email is required"
+	if task.User.UserId == 0 {
+		return false, "not a valid request. please try again later."
 	}
 
 	if task.TaskName == "" {
 		return false, "task name is required"
 	}
-
-	var re = regexp.MustCompile(`^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$`)
-	if !re.MatchString(task.User.Email) {
-		return false, "not a valid email"
-	} 
-
 
 	return true, ""
 }
@@ -296,10 +286,10 @@ func checkTaskExist(taskId int, todoDB *sql.DB) (bool, string) {
     }
 }
 
-func checkUserExists(email string, todoDB *sql.DB) (bool, string) {
+func checkUserExists(userId int, todoDB *sql.DB) (bool, string) {
 	var emailFromDB string
-	userExistsQuery := `SELECT email from users WHERE email=$1;`
-	row := todoDB.QueryRow(userExistsQuery, email)
+	userExistsQuery := `SELECT email from users WHERE user_id=$1;`
+	row := todoDB.QueryRow(userExistsQuery, userId)
 	err := row.Scan(&emailFromDB)
 	switch err {
     case sql.ErrNoRows:
@@ -312,6 +302,7 @@ func checkUserExists(email string, todoDB *sql.DB) (bool, string) {
 }
 
 func validateEmail(email string) (bool, string) {
+	fmt.Println(email)
 	var re = regexp.MustCompile(`^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$`)
 	if !re.MatchString(email) {
 		return false, "not a valid email"
