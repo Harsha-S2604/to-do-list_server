@@ -6,6 +6,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/Harsha-S2604/to-do-list_server/service/todoservice"
+	"github.com/Harsha-S2604/to-do-list_server/service/userservice"
+
 )
 
 func SetupRouter(todoDB *sql.DB) *gin.Engine{
@@ -27,6 +29,11 @@ func SetupRouter(todoDB *sql.DB) *gin.Engine{
 		todoAPIRouter.POST("/add", todoservice.AddTaskHandler(todoDB))
 
 		todoAPIRouter.DELETE("/remove/:id", todoservice.RemoveTaskHandler(todoDB))
+	}
+
+	userAPIRouter := router.Group("api/v1/todo/user")
+	{
+		userAPIRouter.POST("/add", userservice.AddUserHandler(todoDB))
 	}
 
 	return router
