@@ -14,7 +14,7 @@ func main() {
 	} else {
 		r := routes.SetupRouter(todoDB)
 		port := os.Getenv("PORT") 
-		r.Run(port)
+		r.Run(":"+port)
 		defer todoDB.Close()
 	}
 	
