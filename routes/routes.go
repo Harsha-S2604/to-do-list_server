@@ -11,7 +11,7 @@ import (
 )
 
 func SetupRouter(todoDB *sql.DB) *gin.Engine{
-
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	config := cors.Config{
 		AllowOrigins: []string{"http://localhost:3000"},
