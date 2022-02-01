@@ -1,7 +1,7 @@
 # to-do-list_server
 
-## Installation(optional)
+## Installation
 
-By default go build/go run command also executes the go mod download command.
-
-`go mod download`
+### 1. Install golang on your machine
+       
+       go to this [page](https://go.dev/dl/) and follow the instructions to install golang on your machine
