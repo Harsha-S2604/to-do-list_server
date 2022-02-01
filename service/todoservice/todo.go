@@ -204,7 +204,7 @@ func AddTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 	return gin.HandlerFunc(addTask)
 }
 
-func RemoveTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
+func RemoveTaskHandler(todoDB *sql.DB, redisClient *redis.Client) gin.HandlerFunc {
 
 	removeTask := func(ctx *gin.Context) {
 		taskId, taskIdErr := strconv.Atoi(ctx.Params.ByName("id"))
@@ -234,6 +234,49 @@ func RemoveTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		queryParams := ctx.Request.URL.Query()
+		offsetStr, ok := queryParams["offset"]
+		if !ok {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "invalid request",
+			})
+			return
+		}
+
+		offset, offsetErr := strconv.Atoi(offsetStr[0])
+		if offsetErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+
+		userIdStr, ok := queryParams["userId"]
+		if !ok {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "invalid request",
+			})
+			return
+		}
+		
+		userId, userIdErr := strconv.Atoi(userIdStr[0])
+		if userIdErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+
+		redisCachedName := "todo_list_"+userIdStr[0]+"_"+offsetStr[0]
+
 		removeTaskQuery := `DELETE FROM todo_list WHERE task_id=$1`
 		_, removeTaskQueryErr := todoDB.Exec(removeTaskQuery, taskId)
 		if removeTaskQueryErr != nil {
@@ -242,6 +285,11 @@ func RemoveTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 				"message": "Sorry something went wrong. Please try again later.",
 			})
 			return
+		}
+		toBeCachedTodoList, toBeCachedTodoListErr := getTodoLists(todoDB, userId, offset)
+		marshaledTodoList, _  := json.Marshal(toBeCachedTodoList)
+		if toBeCachedTodoListErr == nil {
+			_ = redisClient.Set(ctx, redisCachedName, marshaledTodoList, 100 * time.Second).Err()
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
@@ -328,7 +376,6 @@ func UpdateTaskHandler(todoDB *sql.DB, redisClient *redis.Client) gin.HandlerFun
 		}
 
 		redisCachedName := "todo_list_"+userIdStr[0]+"_"+offsetStr[0]
-		fmt.Println(redisCachedName)
 
 		updateQuery := `UPDATE todo_list SET is_completed=$1 WHERE task_id=$2;`
 		_, updateErr := todoDB.Exec(updateQuery, isCompleted, taskId)

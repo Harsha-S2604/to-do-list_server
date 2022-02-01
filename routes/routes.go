@@ -29,7 +29,7 @@ func SetupRouter(todoDB *sql.DB, redisClient *redis.Client) *gin.Engine{
 
 		todoAPIRouter.POST("/add", todoservice.AddTaskHandler(todoDB))
 
-		todoAPIRouter.DELETE("/remove/:id", todoservice.RemoveTaskHandler(todoDB))
+		todoAPIRouter.DELETE("/remove/:id", todoservice.RemoveTaskHandler(todoDB, redisClient))
 	}
 
 	userAPIRouter := router.Group("api/v1/todo/user")
