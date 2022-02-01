@@ -20,11 +20,15 @@
    
    step 1: Open terminal. Using your favorite editor, Open the `.bashrc` file located in the /home/<username> directory. I am using vim
    
-    `vim .bashrc`
+   ```console
+   $ vim ~/.bashrc
+   ```
    
    step 2: Declare the environment variable
    
-   `export POSTGRE_DB_USERNAME=<username>
-    export POSTGRE_DB_PASSWORD=<password>   
-    export POSTGRE_DB_NAME='test_db'
-    export POSTGRE_DB_PORT='5432'`
+   ```bash
+   export POSTGRE_DB_USERNAME=<username>
+   export POSTGRE_DB_PASSWORD=<password>   
+   export POSTGRE_DB_NAME='test_db'
+   export POSTGRE_DB_PORT='5432'
+   ```
