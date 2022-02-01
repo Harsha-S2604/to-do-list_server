@@ -13,3 +13,11 @@
 ### 3. Install Redis on your machine
    
    go this [page](https://redis.io/topics/quickstart) and follow the instructions to install redis on your machine
+  
+## Database setup
+
+### For linux
+   
+   step 1: using your favorite editor, Open the `.bashrc` file located in the /home/<username> directory. I am using vim
+   
+   `vim .bashrc`
