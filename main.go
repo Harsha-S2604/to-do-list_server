@@ -9,10 +9,11 @@ import (
 func main() {
 
 	todoDB, todoDBErr := db.ConnectDB()
+	redisClient := db.InitRedis()
 	if todoDBErr != nil {
 		panic("Database connection failed: " + todoDBErr.Error())
 	} else {
-		r := routes.SetupRouter(todoDB)
+		r := routes.SetupRouter(todoDB, redisClient)
 		port := os.Getenv("PORT") 
 		r.Run(":"+port)
 		defer todoDB.Close()

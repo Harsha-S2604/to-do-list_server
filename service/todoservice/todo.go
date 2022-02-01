@@ -2,96 +2,63 @@ package todoservice
 
 import (
 	"fmt"
+	"context"
 	"net/http"
 	"database/sql"
 	"regexp"
+	"time"
 	"strconv"
+	"encoding/json"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/Harsha-S2604/to-do-list_server/models"
 
 )
 
-func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
+var contextGlobal = context.Background()
+
+func GetTasksHandler(todoDB *sql.DB, redisClient *redis.Client) gin.HandlerFunc {
 
 	getTasks := func(ctx *gin.Context) {
 		var tasks []models.Task
-		userId, userIdErr := strconv.Atoi(ctx.Params.ByName("id"))
-		if userIdErr != nil {
-			fmt.Println("useriderr", userIdErr.Error())
-			ctx.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "Sorry something went wrong. Please try again later.",
-			})
-			return
-		}
+		userIdStr := ctx.Params.ByName("id")
+		redisCachedName := "todo_list_"+userIdStr
+		cachedTodoList, cachedTodoListErr := redisClient.Get(contextGlobal, redisCachedName).Result()
 
-		isUserExists, isUserExistsMessage := checkUserExists(userId, todoDB)
-		if !isUserExists {
-			ctx.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"data": nil,
-				"message": isUserExistsMessage,
-			})
-			return	
-		}
+		if cachedTodoListErr != nil {
+			userId, userIdErr := strconv.Atoi(userIdStr)
+			if userIdErr != nil {
+				fmt.Println("useriderr", userIdErr.Error())
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "Sorry something went wrong. Please try again later.",
+				})
+				return
+			}
 
-		queryParams := ctx.Request.URL.Query()
-		limitStr, ok := queryParams["limit"]
-		if !ok {
-			ctx.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"data": nil,
-				"message": "invalid request",
-			})
-			return
-		}
-		limit, limitErr := strconv.Atoi(limitStr[0])
-		if limitErr != nil {
-			ctx.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"data": nil,
-				"message": "Sorry something went wrong. Please try again later.",
-			})
-			return
-		}
+			isUserExists, isUserExistsMessage := checkUserExists(userId, todoDB)
+			if !isUserExists {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": isUserExistsMessage,
+				})
+				return	
+			}
 
-		offsetStr, ok := queryParams["offset"]
-		if !ok {
-			ctx.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"data": nil,
-				"message": "invalid request",
-			})
-			return
-		}
-
-		offset, offsetErr := strconv.Atoi(offsetStr[0])
-		if offsetErr != nil {
-			ctx.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"data": nil,
-				"message": "Sorry something went wrong. Please try again later.",
-			})
-			return
-		}
-
-		getQuery := `SELECT * FROM todo_list WHERE user_id=$1 ORDER BY task_id DESC LIMIT $2 OFFSET $3`
-		rows, rowsErr := todoDB.Query(getQuery, userId, limit, offset - 1)
-		if rowsErr != nil {
-			ctx.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"data": nil,
-				"message": "Sorry something went wrong. Please try again later.",
-			})
-			return
-		}
-		for rows.Next() {
-			var task models.Task
-	
-			rowScanErr := rows.Scan(&task.TaskId, &task.TaskName, &task.IsCompleted, &task.User.UserId)
-	
-			if rowScanErr != nil {
+			queryParams := ctx.Request.URL.Query()
+			limitStr, ok := queryParams["limit"]
+			if !ok {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": "invalid request",
+				})
+				return
+			}
+			limit, limitErr := strconv.Atoi(limitStr[0])
+			if limitErr != nil {
 				ctx.JSON(http.StatusOK, gin.H{
 					"success": false,
 					"data": nil,
@@ -99,17 +66,95 @@ func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
 				})
 				return
 			}
-	
-			tasks = append(tasks, task)
-	
-		}
 
+			offsetStr, ok := queryParams["offset"]
+			if !ok {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": "invalid request",
+				})
+				return
+			}
+
+			offset, offsetErr := strconv.Atoi(offsetStr[0])
+			if offsetErr != nil {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": "Sorry something went wrong. Please try again later.",
+				})
+				return
+			}
+
+			getQuery := `SELECT * FROM todo_list WHERE user_id=$1 ORDER BY task_id DESC LIMIT $2 OFFSET $3`
+			rows, rowsErr := todoDB.Query(getQuery, userId, limit, offset - 1)
+			if rowsErr != nil {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": "Sorry something went wrong. Please try again later.",
+				})
+				return
+			}
+			for rows.Next() {
+				var task models.Task
+		
+				rowScanErr := rows.Scan(&task.TaskId, &task.TaskName, &task.IsCompleted, &task.User.UserId)
+		
+				if rowScanErr != nil {
+					ctx.JSON(http.StatusOK, gin.H{
+						"success": false,
+						"data": nil,
+						"message": "Sorry something went wrong. Please try again later.",
+					})
+					return
+				}
+		
+				tasks = append(tasks, task)
+		
+			}
+
+			toBeCachedTodoList, toBeCachedTodoListErr := json.Marshal(tasks)
+			if toBeCachedTodoListErr != nil {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": "Sorry something went wrong. Please try again later.",
+				})
+				return
+			}
+
+			redisCachedName = redisCachedName + "_" + offsetStr[0]
+			setErr := redisClient.Set(ctx, redisCachedName, toBeCachedTodoList, 100 * time.Second).Err()
+
+			if setErr != nil {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": "Sorry something went wrong. Please try again later.",
+				})
+				return
+			}
+
+		} else {
+			unMarshalErr := json.Unmarshal([]byte(cachedTodoList), &tasks)
+			if unMarshalErr != nil {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"data": nil,
+					"message": "Sorry something went wrong. Please try again later.",
+				})
+				return
+			}
+		}
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"message": "",
 			"data": tasks,
 		})
+		
 	}
 
 	return gin.HandlerFunc(getTasks)
@@ -208,7 +253,7 @@ func RemoveTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 	return gin.HandlerFunc(removeTask)
 }
 
-func UpdateTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
+func UpdateTaskHandler(todoDB *sql.DB, redisClient *redis.Client) gin.HandlerFunc {
 	
 	updateTask := func(ctx *gin.Context) {
 		
@@ -241,6 +286,50 @@ func UpdateTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 		var isCompleted interface{}
 		isCompleted = isCompletedArr[0]
 
+		queryParams := ctx.Request.URL.Query()
+		offsetStr, ok := queryParams["offset"]
+		if !ok {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "invalid request",
+			})
+			return
+		}
+
+		offset, offsetErr := strconv.Atoi(offsetStr[0])
+		if offsetErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+
+		userIdStr, ok := queryParams["userId"]
+		if !ok {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "invalid request",
+			})
+			return
+		}
+		
+		userId, userIdErr := strconv.Atoi(userIdStr[0])
+		if userIdErr != nil {
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"data": nil,
+				"message": "Sorry something went wrong. Please try again later.",
+			})
+			return
+		}
+
+		redisCachedName := "todo_list_"+userIdStr[0]+"_"+offsetStr[0]
+		fmt.Println(redisCachedName)
+
 		updateQuery := `UPDATE todo_list SET is_completed=$1 WHERE task_id=$2;`
 		_, updateErr := todoDB.Exec(updateQuery, isCompleted, taskId)
 		if updateErr != nil {
@@ -250,6 +339,14 @@ func UpdateTaskHandler(todoDB *sql.DB) gin.HandlerFunc {
 			})
 			return
 		}
+
+		toBeCachedTodoList, toBeCachedTodoListErr := getTodoLists(todoDB, userId, offset)
+		marshaledTodoList, _  := json.Marshal(toBeCachedTodoList)
+		if toBeCachedTodoListErr == nil {
+			_ := redisClient.Set(ctx, redisCachedName, marshaledTodoList, 100 * time.Second).Err()
+		}
+
+
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"message": "task updated successfully",
@@ -309,4 +406,24 @@ func validateEmail(email string) (bool, string) {
 	}
 
 	return true, ""
+}
+
+func getTodoLists(todoDB *sql.DB, userId, offset int) ([]models.Task, error){
+	getQuery := `SELECT * FROM todo_list WHERE user_id=$1 ORDER BY task_id DESC LIMIT 5 OFFSET $2`
+	rows, _ := todoDB.Query(getQuery, userId, offset - 1)
+	var tasks []models.Task
+	for rows.Next() {
+		var task models.Task
+
+		rowScanErr := rows.Scan(&task.TaskId, &task.TaskName, &task.IsCompleted, &task.User.UserId)
+
+		if rowScanErr != nil {
+			return nil, rowScanErr
+		}
+
+		tasks = append(tasks, task)
+
+	}
+	return tasks, nil
+
 }
