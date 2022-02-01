@@ -20,4 +20,4 @@
    
    step 1: using your favorite editor, Open the `.bashrc` file located in the /home/<username> directory. I am using vim
    
-   $ `vim .bashrc`
+    `$ vim .bashrc`
