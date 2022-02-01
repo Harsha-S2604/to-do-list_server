@@ -343,7 +343,7 @@ func UpdateTaskHandler(todoDB *sql.DB, redisClient *redis.Client) gin.HandlerFun
 		toBeCachedTodoList, toBeCachedTodoListErr := getTodoLists(todoDB, userId, offset)
 		marshaledTodoList, _  := json.Marshal(toBeCachedTodoList)
 		if toBeCachedTodoListErr == nil {
-			_ := redisClient.Set(ctx, redisCachedName, marshaledTodoList, 100 * time.Second).Err()
+			_ = redisClient.Set(ctx, redisCachedName, marshaledTodoList, 100 * time.Second).Err()
 		}
 
 
