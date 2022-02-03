@@ -85,7 +85,7 @@ func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
 		}
 
 		getQuery := `SELECT * FROM todo_list WHERE user_id=$1 ORDER BY task_id DESC LIMIT $2 OFFSET $3`
-		rows, rowsErr := todoDB.Query(getQuery, userId, limit, offset - 1)
+		rows, rowsErr := todoDB.Query(getQuery, userId, limit, offset)
 		if rowsErr != nil {
 			ctx.JSON(http.StatusOK, gin.H{
 				"success": false,
@@ -112,11 +112,14 @@ func GetTasksHandler(todoDB *sql.DB) gin.HandlerFunc {
 	
 		}
 
+		todoListCount := getTodoCount(todoDB, userId)
+
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"message": "",
 			"data": tasks,
+			"totalList": todoListCount,
 		})
 		
 	}
@@ -436,5 +439,16 @@ func getTodoLists(todoDB *sql.DB, userId, offset int) ([]models.Task, error){
 
 	}
 	return tasks, nil
+
+}
+
+func getTodoCount(todoDB *sql.DB, userId int) int {
+	fmt.Println("TODO count")
+	getCountQuery := `SELECT COUNT(*) FROM todo_list WHERE user_id=$1;`
+	row := todoDB.QueryRow(getCountQuery, userId)
+	var count int
+	_ = row.Scan(&count)
+	fmt.Println(count)
+	return count
 
 }
