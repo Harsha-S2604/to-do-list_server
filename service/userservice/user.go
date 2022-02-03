@@ -25,11 +25,12 @@ func AddUserHandler(todoDB *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		isUserExist, isUserExistMsg := utility.CheckUserExists(user.Email, todoDB)
+		isUserExist, isUserExistMsg, userId := utility.CheckUserExists(user.Email, todoDB)
 		if isUserExistMsg == "user exist" {
 			ctx.JSON(http.StatusOK, gin.H{
 				"success": true,
 				"message": isUserExistMsg,
+				"id": userId,
 			})
 			return
 		}

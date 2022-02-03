@@ -17,17 +17,17 @@ func ValidateEmail(email string) (bool, string) {
 	return true, ""
 }
 
-func CheckUserExists(email string, todoDB *sql.DB) (bool, string) {
-	var emailFromDB string
-	userExistsQuery := `SELECT email from users WHERE email=$1;`
+func CheckUserExists(email string, todoDB *sql.DB) (bool, string, int) {
+	var userId int
+	userExistsQuery := `SELECT user_id from users WHERE email=$1;`
 	row := todoDB.QueryRow(userExistsQuery, email)
-	err := row.Scan(&emailFromDB)
+	err := row.Scan(&userId)
 	switch err {
     case sql.ErrNoRows:
-        return true, "user does not exist"
+        return true, "user does not exist", 0
     case nil:
-        return true, "user exist"
+        return true, "user exist", userId
     default:
-        return false, "Sorry something went wrong. Please try again later."
+        return false, "Sorry something went wrong. Please try again later.", 0
     }
 }
